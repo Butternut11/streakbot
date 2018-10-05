@@ -3,9 +3,15 @@ from discord.ext import commands
 from discord.ext.commands import Bot
 import collections
 import os
+import psycopg2
 
 BOT_PREFIX = os.environ['prefix']  # -Prfix is need to declare a Command in discord ex: !pizza "!" being the Prefix
 TOKEN = os.environ['token']  # The token is also substituted for security reasons
+DATABASE_URL = os.environ['DATABASE_URL']
+
+conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+cur = conn.cursor()
+cur.execute("CREATE TABLE tickets(id varchar(27) primary key not null, tickets int)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
 
@@ -15,12 +21,65 @@ pots = collections.defaultdict(list)
 total_pot = collections.defaultdict(list)
 
 
+async def is_zach(ctx):
+    return ctx.author.id == 209081432956600320
+
+
+async def is_staky(ctx):
+    return ctx.author.id == 424233412673536000
+
+
+@bot.command(name="t")
+@commands.check(is_staky)
+async def t(ctx, member: discord.Member, new_tickets: int):
+    user_name = member.id
+    cur.execute(f"SELECT EXISTS(SELECT 1 FROM tickets WHERE id='" + str(user_name) + "')")
+    exists = cur.fetchone()[0]
+    if exists is False:
+        cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {new_tickets})')
+    else:
+        cur.execute("SELECT tickets FROM tickets where id='" + str(user_name) + "'")
+        updated_tickets = cur.fetchone()[0] + new_tickets
+        cur.execute(f"UPDATE tickets SET tickets={updated_tickets} where id='" + str(user_name) + "'")
+    await ctx.send(f'{new_tickets} ticket(s) added to <@{member.id}> tickets')
+
+
+@bot.command(name="tickets")
+async def tickets(ctx, member: discord.Member = None):
+    user_tickets = 0
+    total_tickets = 0
+    cur.execute("SELECT EXISTS(SELECT 1 FROM tickets)")
+    tickets_exist = cur.fetchone()[0]
+    if tickets_exist is True:
+        cur.execute("SELECT tickets FROM tickets")
+        for row in cur:
+            total_tickets += row[0]
+    if member is None:
+        user = ctx.author.id
+    else:
+        user = member.id
+    try:
+        cur.execute("SELECT tickets FROM tickets where id='" + str(user) + "'")
+        try:
+            user_tickets = cur.fetchone()[0]
+        except TypeError:
+            pass
+    except psycopg2.Error:
+        pass
+    if total_tickets > 0:
+        winning = float(user_tickets / total_tickets) * 100
+    else:
+        winning = 0
+    await ctx.send(f'<@{user}> has {user_tickets} tickets. \nYou have a {winning}% of winning.')
+
+
 @bot.command()
 @commands.has_role("Host")
 async def b(ctx, member: discord.Member, bet: float):
     global total_pot
-    payout = round(bet*1.8, 2)
-    new_pot = round(bet*2, 2)
+    user_tickets = int(bet / 5)
+    payout = round(bet * 1.8, 2)
+    new_pot = round(bet * 2, 2)
     temp_str = pots[ctx.author.id]
     formatted_string = f'<@{member.id}>'
     count = 0
@@ -37,7 +96,7 @@ async def b(ctx, member: discord.Member, bet: float):
     total_pot[ctx.author.id].append(f'{new_pot}')
     await ctx.send(embed=discord.Embed(
         title='Confirmation',
-        description='```Added to the pot```'
+        description=f'```{bet}m added to the pot \n{user_tickets} tickets added```'
     ))
 
 
@@ -66,7 +125,8 @@ async def pot(ctx, member: discord.Member = None):
 
     if user in pots:
         for bets in pots[user]:
-            msg += bets + "\n"
+            user_tickets = int(float(bets.split()[2]) / 5)
+            msg += bets + " **Tickets**: " + str(user_tickets) + "\n"
     else:
         msg = "User has no pot"
 
@@ -83,7 +143,7 @@ async def pot(ctx, member: discord.Member = None):
 @bot.command(name="win")
 @commands.has_role("Host")
 async def win(ctx):
-
+    count = 0
     if str(ctx.message.author.id) in streaks:
 
         streaks[str(ctx.message.author.id)].insert(0, "<:win:489151982918172723>")
@@ -98,7 +158,19 @@ async def win(ctx):
 
     if user in pots:
         for bets in pots[user]:
-            msg += bets + "\n"
+            user_tickets = int(float(pots[ctx.author.id][count].split()[2]) / 5)
+            if user_tickets > 0:
+                user_name = str(pots[ctx.author.id][count].split()[0]).split("<@")[1].split(">")[0]
+                cur.execute(f"SELECT EXISTS(SELECT 1 FROM tickets WHERE id='" + str(user_name) + "')")
+                exists = cur.fetchone()[0]
+                if exists is False:
+                    cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
+                else:
+                    cur.execute("SELECT tickets FROM tickets where id='" + str(user_name) + "'")
+                    new_tickets = cur.fetchone()[0] + user_tickets
+                    cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
+            count += 1
+            msg += bets + " **Tickets**: " + str(user_tickets) + "\n"
     else:
         msg = "User has no pot"
 
@@ -133,22 +205,22 @@ async def win(ctx):
 
         total = wins + lossed
     embed.set_author(name=user.name, icon_url=user.avatar_url)
-        
-    embed.set_footer(text="WINS: "+str(wins)+"		LOSS: "+str(lossed)+"		TOTAL DUELS: "+str(total))
+
+    embed.set_footer(text="WINS: " + str(wins) + "		LOSS: " + str(lossed) + "		TOTAL DUELS: " + str(total))
     if message_to_send == "":
         message_to_send = "Nothing"
-        
+
     embed.add_field(name="All Streaks", value=message_to_send)
-        
+
     await ctx.message.channel.send(embed=embed)
 
 
 @bot.command(name="loss")
 @commands.has_role("Host")
 async def loss(ctx):
-    
+    count = 0
     if str(ctx.message.author.id) in streaks:
-    
+
         streaks[str(ctx.message.author.id)].insert(0, "<:loss:489151983018704896>")
     else:
         streaks[str(ctx.message.author.id)] = []
@@ -161,7 +233,19 @@ async def loss(ctx):
 
     if user in pots:
         for bets in pots[user]:
-            msg += bets + "\n"
+            user_tickets = int(float(pots[ctx.author.id][count].split()[2]) / 5)
+            if user_tickets > 0:
+                user_name = str(pots[ctx.author.id][count].split()[0]).split("<@")[1].split(">")[0]
+                cur.execute(f"SELECT EXISTS(SELECT 1 FROM tickets WHERE id='" + str(user_name) + "')")
+                exists = cur.fetchone()[0]
+                if exists is False:
+                    cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
+                else:
+                    cur.execute("SELECT tickets FROM tickets where id='" + str(user_name) + "'")
+                    new_tickets = cur.fetchone()[0] + user_tickets
+                    cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
+            count += 1
+            msg += bets + " **Tickets**: " + str(user_tickets) + "\n"
     else:
         msg = "User has no pot"
 
@@ -196,22 +280,21 @@ async def loss(ctx):
 
         total = wins + lossed
     embed.set_author(name=user.name, icon_url=user.avatar_url)
-        
-    embed.set_footer(text="WINS: "+str(wins)+"		LOSS: "+str(lossed)+"		TOTAL DUELS: "+str(total))
+
+    embed.set_footer(text="WINS: " + str(wins) + "		LOSS: " + str(lossed) + "		TOTAL DUELS: " + str(total))
     if message_to_send == "":
         message_to_send = "Nothing"
-        
+
     embed.add_field(name="All Streaks", value=message_to_send)
-        
+
     await ctx.message.channel.send(embed=embed)
 
 
 @bot.command(name="fresh")
 @commands.has_role("Host")
 async def fresh(ctx):
-    
     if str(ctx.message.author.id) in streaks:
-    
+
         streaks[str(ctx.message.author.id)].insert(0, "<:fresh:489151981789904917>")
     else:
         streaks[str(ctx.message.author.id)] = []
@@ -236,26 +319,21 @@ async def fresh(ctx):
 
         total = wins + lossed
     embed.set_author(name=user.name, icon_url=user.avatar_url)
-        
-    embed.set_footer(text="WINS: "+str(wins)+"		LOSS: "+str(lossed)+"		TOTAL DUELS: "+str(total))
+
+    embed.set_footer(text="WINS: " + str(wins) + "		LOSS: " + str(lossed) + "		TOTAL DUELS: " + str(total))
     if message_to_send == "":
         message_to_send = "Nothing"
-        
+
     embed.add_field(name="All Streaks", value=message_to_send)
-        
+
     await ctx.message.channel.send(embed=embed)
-    
+
 
 @bot.command(name="streakreset")
 @commands.has_role("Host")
 async def streakreset(ctx):
-    
     streaks[str(ctx.message.author.id)] = []
     total_pot[ctx.message.author.id] = []
-
-
-async def is_zach(ctx):
-    return ctx.author.id == 209081432956600320
 
 
 @bot.command(name="zach")
@@ -278,8 +356,7 @@ async def stop(ctx):
 
 @bot.command(name="streak")
 async def streak(ctx, member: discord.Member = None):
-
-    if member is None: 
+    if member is None:
         user = ctx.message.author
     else:
         user = member
@@ -310,12 +387,14 @@ async def streak(ctx, member: discord.Member = None):
             total = wins + lossed
         embed.set_author(name=user.name, icon_url=user.avatar_url)
 
-        embed.set_footer(text="WINS: "+str(wins)+"		LOSS: "+str(lossed)+"		TOTAL DUELS: "+str(total))
+        embed.set_footer(
+            text="WINS: " + str(wins) + "		LOSS: " + str(lossed) + "		TOTAL DUELS: " + str(total))
         if message_to_send == "":
             message_to_send = "Nothing"
 
         embed.add_field(name="All Streaks", value=message_to_send)
 
         await ctx.message.channel.send(embed=embed)
+
 
 bot.run(TOKEN)
