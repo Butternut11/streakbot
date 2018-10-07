@@ -5,6 +5,10 @@ import collections
 import os
 import psycopg2
 
+# Show top 5 tickets
+# Number the ticket holders
+# A logging channel
+
 BOT_PREFIX = os.environ['prefix']  # -Prfix is need to declare a Command in discord ex: !pizza "!" being the Prefix
 TOKEN = os.environ['token']  # The token is also substituted for security reasons
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -14,11 +18,14 @@ cur = conn.cursor()
 cur.execute("CREATE TABLE tickets(id varchar(27) primary key not null, tickets int)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
+client = discord.Client()
 
 streaks = {}
 
 pots = collections.defaultdict(list)
 total_pot = collections.defaultdict(list)
+practice_channel = 498363312736698379
+ticket_channel = 498361706280648714
 
 
 async def is_zach(ctx):
@@ -27,6 +34,24 @@ async def is_zach(ctx):
 
 async def is_staky(ctx):
     return ctx.author.id == 424233412673536000
+
+
+@bot.command(name="top")
+async def top_tickets(ctx, competition: str):
+    msg = ""
+    count = 0
+    if competition is "t":
+        cur.execute(f"SELECT * FROM tickets order by tickets desc limit 5")
+        for row in cur:
+            count += 1
+            temp_msg = str(row).split(",")
+            new_id = str(temp_msg[0])[2:-1]
+            new_tickets = str(temp_msg[1])[:-1]
+            msg += f"<@{new_id}> {new_tickets}\n"
+
+    embed = discord.Embed()
+    embed.add_field(name='Top Tickets', value=msg)
+    await ctx.send(embed=embed)
 
 
 @bot.command(name="t")
@@ -165,10 +190,18 @@ async def win(ctx):
                 exists = cur.fetchone()[0]
                 if exists is False:
                     cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
+                    embed = discord.Embed()
+                    embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
+                    log_channel = bot.get_channel(ticket_channel)
+                    await log_channel.send(embed=embed)
                 else:
                     cur.execute("SELECT tickets FROM tickets where id='" + str(user_name) + "'")
                     new_tickets = cur.fetchone()[0] + user_tickets
                     cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
+                    embed = discord.Embed()
+                    embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
+                    log_channel = bot.get_channel(ticket_channel)
+                    await log_channel.send(embed=embed)
             count += 1
             msg += bets + " **Tickets**: " + str(user_tickets) + "\n"
     else:
@@ -240,10 +273,18 @@ async def loss(ctx):
                 exists = cur.fetchone()[0]
                 if exists is False:
                     cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
+                    embed = discord.Embed()
+                    embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
+                    log_channel = bot.get_channel(ticket_channel)
+                    await log_channel.send(embed=embed)
                 else:
                     cur.execute("SELECT tickets FROM tickets where id='" + str(user_name) + "'")
                     new_tickets = cur.fetchone()[0] + user_tickets
                     cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
+                    embed = discord.Embed()
+                    embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
+                    log_channel = bot.get_channel(ticket_channel)
+                    await log_channel.send(embed=embed)
             count += 1
             msg += bets + " **Tickets**: " + str(user_tickets) + "\n"
     else:
