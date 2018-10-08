@@ -11,8 +11,8 @@ DATABASE_URL = os.environ['DATABASE_URL']
 
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cur = conn.cursor()
-cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
-            "null, tickets int DEFAULT 0, rs3 float DEFAULT 0, osrs float DEFAULT 0)")
+# cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
+#             "null, tickets int DEFAULT 0, rs3 float DEFAULT 0, osrs float DEFAULT 0)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
 client = discord.Client()
@@ -93,7 +93,7 @@ async def top_tickets(ctx, competition: str):
             count += 1
             temp_msg = str(row).split(",")
             new_id = str(temp_msg[0])[2:-1]
-            new_tickets = str(temp_msg[1])[:-1]
+            new_tickets = str(temp_msg[1])
             msg += f"<@{new_id}> {new_tickets}\n"
 
     embed = discord.Embed()
