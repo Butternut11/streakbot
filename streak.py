@@ -11,8 +11,8 @@ DATABASE_URL = os.environ['DATABASE_URL']
 
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cur = conn.cursor()
-# cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
-#             "null, tickets int DEFAULT 0, rs3 float DEFAULT 0, osrs float DEFAULT 0)")
+cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
+            "null, tickets int DEFAULT 0, rs3 float DEFAULT 0, osrs float DEFAULT 0)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
 client = discord.Client()
