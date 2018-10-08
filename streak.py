@@ -11,7 +11,8 @@ DATABASE_URL = os.environ['DATABASE_URL']
 
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cur = conn.cursor()
-cur.execute("CREATE TABLE tickets(id varchar(27) primary key not null, tickets int)")
+cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
+            "null, tickets int DEFAULT 0, rs3 int DEFAULT 0, osrs int DEFAULT 0)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
 client = discord.Client()
@@ -20,7 +21,7 @@ streaks = {}
 
 pots = collections.defaultdict(list)
 total_pot = collections.defaultdict(list)
-# practice_channel = 498363312736698379
+# ticket_channel = 498363312736698379
 ticket_channel = 498361706280648714
 
 
@@ -30,6 +31,49 @@ async def is_zach(ctx):
 
 async def is_staky(ctx):
     return ctx.author.id == 424233412673536000
+
+
+@bot.command(name="ct")
+@commands.has_role("Cashier")
+async def cashing(ctx, currency: str, amount: float):
+    if currency != "rs3" and currency != "07":
+        return
+    if currency == "07":
+        currency = "osrs"
+    user_name = ctx.author.id
+    cur.execute(f"SELECT EXISTS(SELECT 1 FROM tickets WHERE id='" + str(user_name) + "')")
+    exists = cur.fetchone()[0]
+    if exists is False:
+        cur.execute(f'INSERT INTO tickets (id, {currency}) VALUES ({user_name}, {amount})')
+    else:
+        cur.execute("SELECT " + currency + " FROM tickets where id='" + str(user_name) + "'")
+        updated_amount = int(cur.fetchone()[0]) + int(amount)
+        cur.execute(f"UPDATE tickets SET {currency}={updated_amount} where id='" + str(user_name) + "'")
+    await ctx.send(embed=discord.Embed(
+        title='Cashier Total Addition',
+        description=f'Successfully added {amount} to your {currency} totals'
+    ))
+
+
+@bot.command(name="slave")
+@commands.has_role("Cashier")
+async def cashier_totals(ctx, member: discord.Member = None):
+    if member is None:
+        user_name = ctx.author.id
+    else:
+        user_name = member.id
+    cur.execute(f"SELECT EXISTS(SELECT 1 FROM tickets WHERE id='" + str(user_name) + "')")
+    exists = cur.fetchone()[0]
+    print(exists)
+    if exists is True:
+        cur.execute("SELECT (rs3, osrs) from tickets WHERE id='" + str(user_name) + "'")
+        totals = cur.fetchone()[0].split(",")
+        total_rs3 = totals[0][1:]
+        total_07 = totals[1][:-1]
+        await ctx.send(embed=discord.Embed(
+            title='Cashier Total',
+            description=f'You have slaved: {total_rs3}m rs3 and {total_07}m 07'
+        ))
 
 
 @bot.command(name="ticketsreset")
