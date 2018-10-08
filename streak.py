@@ -69,7 +69,7 @@ async def winners(ctx):
         new_id = str(temp_msg[0])[2:-1]
         new_tickets = str(temp_msg[1])[:-1]
         new_count += int(new_tickets)
-        msg += f"<@{new_id}> has {new_tickets} tickets {count} - {new_count}\n"
+        msg += f"<@{new_id}> has {new_tickets} tickets {count+1} - {new_count}\n"
         count += int(new_tickets)
     embed = discord.Embed()
     embed.add_field(name='Top Tickets', value=msg)
