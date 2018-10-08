@@ -12,7 +12,7 @@ DATABASE_URL = os.environ['DATABASE_URL']
 conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 cur = conn.cursor()
 cur.execute("CREATE TABLE tickets(id varchar(27) primary key not "
-            "null, tickets int DEFAULT 0, rs3 int DEFAULT 0, osrs int DEFAULT 0)")
+            "null, tickets int DEFAULT 0, rs3 float DEFAULT 0, osrs float DEFAULT 0)")
 
 bot = Bot(command_prefix=BOT_PREFIX)
 client = discord.Client()
@@ -47,7 +47,7 @@ async def cashing(ctx, currency: str, amount: float):
         cur.execute(f'INSERT INTO tickets (id, {currency}) VALUES ({user_name}, {amount})')
     else:
         cur.execute("SELECT " + currency + " FROM tickets where id='" + str(user_name) + "'")
-        updated_amount = int(cur.fetchone()[0]) + int(amount)
+        updated_amount = float(cur.fetchone()[0]) + float(amount)
         cur.execute(f"UPDATE tickets SET {currency}={updated_amount} where id='" + str(user_name) + "'")
     await ctx.send(embed=discord.Embed(
         title='Cashier Total Addition',
