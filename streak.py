@@ -5,10 +5,6 @@ import collections
 import os
 import psycopg2
 
-# Show top 5 tickets
-# Number the ticket holders
-# A logging channel
-
 BOT_PREFIX = os.environ['prefix']  # -Prfix is need to declare a Command in discord ex: !pizza "!" being the Prefix
 TOKEN = os.environ['token']  # The token is also substituted for security reasons
 DATABASE_URL = os.environ['DATABASE_URL']
@@ -24,7 +20,7 @@ streaks = {}
 
 pots = collections.defaultdict(list)
 total_pot = collections.defaultdict(list)
-practice_channel = 498363312736698379
+# practice_channel = 498363312736698379
 ticket_channel = 498361706280648714
 
 
@@ -34,6 +30,13 @@ async def is_zach(ctx):
 
 async def is_staky(ctx):
     return ctx.author.id == 424233412673536000
+
+
+@bot.command(name="ticketsreset")
+@commands.check(is_staky)
+async def reset_tickets(ctx):
+    cur.execute(f"TRUNCATE tickets")
+    await ctx.send("Tickets have been reset.")
 
 
 @bot.command(name="top")
@@ -49,6 +52,25 @@ async def top_tickets(ctx, competition: str):
             new_tickets = str(temp_msg[1])[:-1]
             msg += f"<@{new_id}> {new_tickets}\n"
 
+    embed = discord.Embed()
+    embed.add_field(name='Top Tickets', value=msg)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name="winners")
+@commands.check(is_staky)
+async def winners(ctx):
+    count = 0
+    new_count = 0
+    msg = ""
+    cur.execute(f"SELECT * FROM tickets")
+    for row in cur:
+        temp_msg = str(row).split(",")
+        new_id = str(temp_msg[0])[2:-1]
+        new_tickets = str(temp_msg[1])[:-1]
+        new_count += int(new_tickets)
+        msg += f"<@{new_id}> has {new_tickets} tickets {count} - {new_count}\n"
+        count += int(new_tickets)
     embed = discord.Embed()
     embed.add_field(name='Top Tickets', value=msg)
     await ctx.send(embed=embed)
@@ -191,6 +213,7 @@ async def win(ctx):
                 if exists is False:
                     cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
                     embed = discord.Embed()
+                    embed.set_author(name=ctx.message.author, icon_url=ctx.message.author.avatar_url)
                     embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
                     log_channel = bot.get_channel(ticket_channel)
                     await log_channel.send(embed=embed)
@@ -199,6 +222,7 @@ async def win(ctx):
                     new_tickets = cur.fetchone()[0] + user_tickets
                     cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
                     embed = discord.Embed()
+                    embed.set_author(name=ctx.message.author, icon_url=ctx.message.author.avatar_url)
                     embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
                     log_channel = bot.get_channel(ticket_channel)
                     await log_channel.send(embed=embed)
@@ -274,6 +298,7 @@ async def loss(ctx):
                 if exists is False:
                     cur.execute(f'INSERT INTO tickets (id, tickets) VALUES ({user_name}, {user_tickets})')
                     embed = discord.Embed()
+                    embed.set_author(name=ctx.message.author, icon_url=ctx.message.author.avatar_url)
                     embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
                     log_channel = bot.get_channel(ticket_channel)
                     await log_channel.send(embed=embed)
@@ -282,6 +307,7 @@ async def loss(ctx):
                     new_tickets = cur.fetchone()[0] + user_tickets
                     cur.execute(f"UPDATE tickets SET tickets={new_tickets} where id='" + str(user_name) + "'")
                     embed = discord.Embed()
+                    embed.set_author(name=ctx.message.author, icon_url=ctx.message.author.avatar_url)
                     embed.add_field(name='Ticket(s) Update', value=f'<@{user_name}> Received {user_tickets} Ticket(s)')
                     log_channel = bot.get_channel(ticket_channel)
                     await log_channel.send(embed=embed)
